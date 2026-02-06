@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
+<html lang="en"><head><meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amsterdam Oost - Linnaeusstraat Food Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -17,6 +15,8 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.35);
       display: flex; align-items: center; justify-content: center;
       font-size: 13px; cursor: pointer;
+      transform: scale(var(--pin-scale, 1));
+      transition: transform 0.12s;
     }
     .marker-dot.has-photo { animation: pulse 2s infinite; }
     @keyframes pulse {
@@ -194,6 +194,38 @@
       width: 12px; height: 12px; border-radius: 50%;
       border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
     }
+
+    .photo-marker { background: none; border: none; }
+    .photo-pin {
+      width: 120px; height: 120px; border-radius: 50%; overflow: hidden;
+      border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      background: #fff;
+      transform: scale(var(--pin-scale, 1));
+      transition: transform 0.16s, box-shadow 0.16s;
+    }
+    .photo-pin img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-pin:hover {
+      transform: scale(var(--pin-scale-hover, 1.2));
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+    }
+
+    .flip-card {
+      width: 320px; height: 220px; perspective: 1000px;
+    }
+    .flip-card-inner {
+      position: relative; width: 100%; height: 100%;
+      transition: transform 0.6s; transform-style: preserve-3d;
+    }
+    .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
+    .flip-face {
+      position: absolute; inset: 0; backface-visibility: hidden;
+      border-radius: 8px; overflow: hidden; background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .flip-front img { width: 100%; height: 100%; object-fit: cover; }
+    .flip-back {
+      transform: rotateY(180deg); padding: 10px 12px; overflow: auto;
+    }
   </style>
 </head>
 <body>
@@ -204,21 +236,22 @@
   <button class="ctrl-btn" id="btn-add" onclick="toggleAddMode()">📍 Add Point</button>
   <button class="ctrl-btn" onclick="toggleSidebar()">📋 All Locations</button>
   <button class="ctrl-btn" onclick="togglePhotoPanel()">🖼️ Photo Manager</button>
+  <button class="ctrl-btn active" id="btn-photo-layer" onclick="togglePhotoLayer()">📷 Photo Layer</button>
   <button class="ctrl-btn" onclick="exportGeoJSON()">💾 Export GeoJSON</button>
 </div>
 
-<div class="sidebar" id="sidebar">
+<div class="sidebar open" id="sidebar">
   <div class="sidebar-hdr">
-    <h2>📍 All Locations (<span id="loc-count">0</span>)</h2>
+    <h2>📍 All Locations (<span id="loc-count">45</span>)</h2>
     <button class="sidebar-close" onclick="toggleSidebar()">×</button>
   </div>
   <div class="sidebar-body">
     <input class="sidebar-filter" id="filter" type="text" placeholder="🔍 Search locations..." oninput="updateList()">
-    <div id="loc-list"></div>
+    <div id="loc-list"><div class="loc-item" onclick="flyTo(1)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Meram</h4><p>Pretoriusstraat 22-H</p></div></div><div class="loc-item" onclick="flyTo(2)"><div class="dot" style="background:#27ae60"></div><div><h4>🛒 DekaMarkt</h4><p>Pretoriusstraat 9</p></div></div><div class="loc-item" onclick="flyTo(3)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Konet</h4><p>Pretoriusstraat 10-H</p></div></div><div class="loc-item" onclick="flyTo(4)"><div class="dot" style="background:#9b59b6"></div><div><h4>🍺 Cafe Sport</h4><p>Linnaeusstraat 102</p></div><span class="photo-count">📷 3</span></div><div class="loc-item" onclick="flyTo(5)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Natraj</h4><p>Transvaalstraat 5</p></div></div><div class="loc-item" onclick="flyTo(6)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Fuku Ramen</h4><p>Ingogostraat 14A</p></div></div><div class="loc-item" onclick="flyTo(7)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 Toko Sumatra Deli</h4><p>Linnaeusstraat area</p></div><span class="photo-count">📷 1</span></div><div class="loc-item" onclick="flyTo(8)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ The Cottage Shop &amp; Deli</h4><p>Linnaeusstraat 76-H</p></div></div><div class="loc-item" onclick="flyTo(9)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Cafecito</h4><p>Linnaeusstraat 112-H</p></div><span class="photo-count">📷 2</span></div><div class="loc-item" onclick="flyTo(10)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 FEBO</h4><p>Linnaeusstraat 92</p></div><span class="photo-count">📷 2</span></div><div class="loc-item" onclick="flyTo(11)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 Ayaz Döner</h4><p>Linnaeusstraat 213</p></div><span class="photo-count">📷 1</span></div><div class="loc-item" onclick="flyTo(12)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Grapedistrict</h4><p>Linnaeusstraat area</p></div><span class="photo-count">📷 2</span></div><div class="loc-item" onclick="flyTo(13)"><div class="dot" style="background:#9b59b6"></div><div><h4>🍺 Ruk en Pluk</h4><p>Linnaeusstraat area</p></div></div><div class="loc-item" onclick="flyTo(14)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Q Cafe</h4><p>Oranje-Vrijstaatkade area</p></div></div><div class="loc-item" onclick="flyTo(15)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Meram Cafe</h4><p>Linnaeusstraat 219</p></div><span class="photo-count">📷 2</span></div><div class="loc-item" onclick="flyTo(16)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Rum Baba</h4><p>Pretoriusstraat 15</p></div></div><div class="loc-item" onclick="flyTo(17)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ The Cottage</h4><p>Linnaeusstraat 88</p></div><span class="photo-count">📷 5</span></div><div class="loc-item" onclick="flyTo(18)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Wakuli</h4><p>Oranje-Vrijstaatkade</p></div><span class="photo-count">📷 3</span></div><div class="loc-item" onclick="flyTo(19)"><div class="dot" style="background:#27ae60"></div><div><h4>🛒 Albert Heijn</h4><p>Land van Cocagneplein 3</p></div></div><div class="loc-item" onclick="flyTo(20)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 Burger 'n Shake</h4><p>Land van Cocagneplein 1D</p></div><span class="photo-count">📷 1</span></div><div class="loc-item" onclick="flyTo(21)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Vitaminstore</h4><p>Land van Cocagneplein 46</p></div></div><div class="loc-item" onclick="flyTo(22)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ De Bakkerszonen</h4><p>Land van Cocagneplein 48</p></div></div><div class="loc-item" onclick="flyTo(23)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Simon Lévelt</h4><p>Waldenlaan 4</p></div></div><div class="loc-item" onclick="flyTo(24)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Bagels &amp; Beans</h4><p>Oranje-Vrijstaatkade 68</p></div></div><div class="loc-item" onclick="flyTo(25)"><div class="dot" style="background:#9b59b6"></div><div><h4>🍺 De Bierkantine</h4><p>Oranje-Vrijstaatkade 69</p></div></div><div class="loc-item" onclick="flyTo(26)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Holland &amp; Barrett</h4><p>Waldenlaan 129</p></div></div><div class="loc-item" onclick="flyTo(27)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Miss Hotpot</h4><p>Linnaeusstraat 64-H</p></div></div><div class="loc-item" onclick="flyTo(28)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 New York Pizza</h4><p>Linnaeusstraat 68-H</p></div></div><div class="loc-item" onclick="flyTo(29)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Marina Plaza</h4><p>Linnaeusstraat 74-H</p></div></div><div class="loc-item" onclick="flyTo(30)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Sahan</h4><p>Waldenlaan 135</p></div></div><div class="loc-item" onclick="flyTo(31)"><div class="dot" style="background:#27ae60"></div><div><h4>🛒 Jumbo</h4><p>Linnaeusstraat 245-H</p></div><span class="photo-count">📷 1</span></div><div class="loc-item" onclick="flyTo(32)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Biolicious</h4><p>Land van Cocagneplein 5</p></div></div><div class="loc-item" onclick="flyTo(33)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Moche</h4><p>Linnaeuskade 3-H</p></div></div><div class="loc-item" onclick="flyTo(34)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Nomads</h4><p>Oranje-Vrijstaatkade 55</p></div></div><div class="loc-item" onclick="flyTo(35)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Yemen Restaurant</h4><p>Oranje-Vrijstaatkade 66</p></div></div><div class="loc-item" onclick="flyTo(36)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Mas Atelier</h4><p>Pretoriusstraat 33</p></div></div><div class="loc-item" onclick="flyTo(37)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Flour.ish</h4><p>Pretoriusstraat 37</p></div></div><div class="loc-item" onclick="flyTo(38)"><div class="dot" style="background:#9b59b6"></div><div><h4>🍺 Blend Coffee and Wine</h4><p>Oranje-Vrijstaatkade area</p></div></div><div class="loc-item" onclick="flyTo(39)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Eighty-Four</h4><p>Oranje-Vrijstaatkade 25</p></div></div><div class="loc-item" onclick="flyTo(40)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Biolicious (Linnaeusstraat)</h4><p>Linnaeusstraat 70-72</p></div></div><div class="loc-item" onclick="flyTo(41)"><div class="dot" style="background:#e67e22"></div><div><h4>🍟 Helin's Döner</h4><p>Linnaeusstraat 221</p></div><span class="photo-count">📷 1</span></div><div class="loc-item" onclick="flyTo(42)"><div class="dot" style="background:#f39c12"></div><div><h4>☕ Kwekkeboom</h4><p>Land van Cocagneplein</p></div></div><div class="loc-item" onclick="flyTo(43)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Aan De Kade</h4><p>Linnaeuskade area</p></div></div><div class="loc-item" onclick="flyTo(44)"><div class="dot" style="background:#2980b9"></div><div><h4>🛍️ Drankerij</h4><p>Linnaeusstraat area</p></div></div><div class="loc-item" onclick="flyTo(45)"><div class="dot" style="background:#e74c3c"></div><div><h4>🍽️ Safak</h4><p>Linnaeusstraat</p></div><span class="photo-count">📷 1</span></div></div>
   </div>
 </div>
 
-<div class="photo-panel" id="photo-panel">
+<div class="photo-panel open" id="photo-panel">
   <div class="photo-panel-hdr">
     <div>
       <h3>🖼️ Photo Manager — click a photo, then click a marker to attach</h3>
@@ -226,7 +259,7 @@
     </div>
     <button class="photo-panel-close" onclick="togglePhotoPanel()">×</button>
   </div>
-  <div class="photo-strip" id="photo-strip"></div>
+  <div class="photo-strip" id="photo-strip"><div class="photo-thumb" title="Click to select" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg" alt="WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg</div></div><div class="photo-thumb" title="Click to select" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 13.10.12.jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 13.10.12.jpeg" alt="WhatsApp Image 2026-02-05 at 13.10.12.jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 13.10.12.jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 13.10.12.jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: The Cottage" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.31.58.jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.31.58.jpeg" alt="WhatsApp Image 2026-02-05 at 16.31.58.jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.31.58.jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.31.58.jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Cafecito" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg" alt="WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Cafe Sport" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg" alt="WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: The Cottage" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg" alt="WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Cafecito" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.31.59.jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.31.59.jpeg" alt="WhatsApp Image 2026-02-05 at 16.31.59.jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.31.59.jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.31.59.jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Wakuli" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg" alt="WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Wakuli" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg" alt="WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Helin&#39;s Döner" onclick="selectPhoto(&#39;photos/WhatsApp Image 2026-02-05 at 16.32.00.jpeg&#39;)"><img src="./map_files/WhatsApp Image 2026-02-05 at 16.32.00.jpeg" alt="WhatsApp Image 2026-02-05 at 16.32.00.jpeg" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;WhatsApp Image 2026-02-05 at 16.32.00.jpeg&lt;/div&gt;&#39;"><div class="label">WhatsApp Image 2026-02-05 at 16.32.00.jpeg</div></div><div class="photo-thumb assigned" title="Assigned to: Meram Cafe" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 155352.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 155352.png" alt="Schermafbeelding 2026-02-05 155352.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 155352.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 155352.png</div></div><div class="photo-thumb assigned" title="Assigned to: Grapedistrict" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 160039.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 160039.png" alt="Schermafbeelding 2026-02-05 160039.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 160039.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 160039.png</div></div><div class="photo-thumb assigned" title="Assigned to: The Cottage" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 160129.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 160129.png" alt="Schermafbeelding 2026-02-05 160129.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 160129.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 160129.png</div></div><div class="photo-thumb assigned" title="Assigned to: Toko Sumatra Deli" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 160144.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 160144.png" alt="Schermafbeelding 2026-02-05 160144.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 160144.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 160144.png</div></div><div class="photo-thumb assigned" title="Assigned to: FEBO" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 161524.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 161524.png" alt="Schermafbeelding 2026-02-05 161524.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 161524.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 161524.png</div></div><div class="photo-thumb assigned" title="Assigned to: Cafe Sport" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224239.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224239.png" alt="Schermafbeelding 2026-02-05 224239.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224239.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224239.png</div></div><div class="photo-thumb assigned" title="Assigned to: The Cottage" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224703.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224703.png" alt="Schermafbeelding 2026-02-05 224703.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224703.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224703.png</div></div><div class="photo-thumb assigned" title="Assigned to: The Cottage" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224728.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224728.png" alt="Schermafbeelding 2026-02-05 224728.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224728.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224728.png</div></div><div class="photo-thumb assigned" title="Assigned to: Ayaz Döner" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224751.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224751.png" alt="Schermafbeelding 2026-02-05 224751.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224751.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224751.png</div></div><div class="photo-thumb assigned" title="Assigned to: Safak" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224802.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224802.png" alt="Schermafbeelding 2026-02-05 224802.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224802.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224802.png</div></div><div class="photo-thumb assigned" title="Assigned to: Meram Cafe" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224822.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224822.png" alt="Schermafbeelding 2026-02-05 224822.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224822.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224822.png</div></div><div class="photo-thumb assigned" title="Assigned to: Burger &#39;n Shake" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224843.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224843.png" alt="Schermafbeelding 2026-02-05 224843.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224843.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224843.png</div></div><div class="photo-thumb assigned" title="Assigned to: Wakuli" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 224901.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 224901.png" alt="Schermafbeelding 2026-02-05 224901.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 224901.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 224901.png</div></div><div class="photo-thumb assigned" title="Assigned to: Jumbo" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 225001.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 225001.png" alt="Schermafbeelding 2026-02-05 225001.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 225001.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 225001.png</div></div><div class="photo-thumb assigned" title="Assigned to: FEBO" onclick="selectPhoto(&#39;photos/Schermafbeelding 2026-02-05 225055.png&#39;)"><img src="./map_files/Schermafbeelding 2026-02-05 225055.png" alt="Schermafbeelding 2026-02-05 225055.png" onerror="this.parentElement.innerHTML=&#39;&lt;div style=padding:8px;font-size:10px;color:#999;text-align:center&gt;Schermafbeelding 2026-02-05 225055.png&lt;/div&gt;&#39;"><div class="label">Schermafbeelding 2026-02-05 225055.png</div></div></div>
 </div>
 
 <div class="add-form" id="add-form">
@@ -256,7 +289,7 @@
 
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close">×</button>
-  <img id="lb-img" src="">
+  <img id="lb-img" src="./map_files/Schermafbeelding 2026-02-05 224843.png">
 </div>
 
 <div class="legend">
@@ -269,7 +302,7 @@
   <div class="legend-row"><div class="legend-dot" style="background:#2980b9"></div> Shop</div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">📷 Photo assigned to Cafe Sport</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -359,9 +392,10 @@ const availablePhotos = [
 // MAP
 // ======================================================================
 const map = L.map('map').setView([52.3563, 4.9278], 17);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>',
-  maxZoom: 20
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 20,
+  subdomains: 'abcd'
 }).addTo(map);
 
 const catColors = {
@@ -379,6 +413,82 @@ function getCatClass(c) { return catColors[c] ? 'cat-' + c : 'cat-other'; }
 const markers = {};
 let addMode = false, tempMarker = null, nextId = locations.length + 1;
 let selectedPhoto = null, photoAssignMode = false;
+const popupCloseTimers = new WeakMap();
+
+const photoLayer = L.layerGroup().addTo(map);
+let photoLayerVisible = true;
+
+function updateMarkerScale() {
+  var z = map.getZoom();
+  var scale = 0.75 + Math.max(0, z - 15) * 0.12;
+  if (scale < 0.75) scale = 0.75;
+  if (scale > 1.6) scale = 1.6;
+  var hoverScale = Math.min(scale + 0.25, 1.9);
+  var el = map.getContainer();
+  el.style.setProperty('--pin-scale', scale.toFixed(2));
+  el.style.setProperty('--pin-scale-hover', hoverScale.toFixed(2));
+}
+
+function renderPhotoLayer() {
+  photoLayer.clearLayers();
+  if (!photoLayerVisible) return;
+  locations.forEach(function(loc) {
+    if (!loc.photos || !loc.photos.length) return;
+    var thumb = loc.photos[0];
+    var icon = L.divIcon({
+      className: 'photo-marker',
+      html: '<div class="photo-pin"><img src="' + thumb + '" alt="' + loc.name.replace(/"/g, '&quot;') + '"></div>',
+      iconSize: [120, 120], iconAnchor: [60, 60], popupAnchor: [0, -60]
+    });
+    var pm = L.marker([loc.lat, loc.lng], { icon: icon })
+      .addTo(photoLayer)
+      .bindPopup(function() { return popupHTML(loc); }, { maxWidth: 360 });
+    attachStickyPopup(pm);
+  });
+}
+
+function attachStickyPopup(marker) {
+  marker.on('mouseover', function(e) {
+    clearStickyTimer(marker);
+    e.target.openPopup();
+    setTimeout(function() { wirePopupHover(marker); }, 0);
+  });
+  marker.on('mouseout', function() {
+    startStickyClose(marker, 300);
+  });
+}
+
+function wirePopupHover(marker) {
+  var popup = marker.getPopup && marker.getPopup();
+  var el = popup && popup.getElement && popup.getElement();
+  if (!el) return;
+  if (el._stickyBound) return;
+  el._stickyBound = true;
+  el.addEventListener('mouseenter', function() { clearStickyTimer(marker); });
+  el.addEventListener('mouseleave', function() { startStickyClose(marker, 300); });
+}
+
+function startStickyClose(marker, delayMs) {
+  clearStickyTimer(marker);
+  var t = setTimeout(function() { marker.closePopup(); }, delayMs || 0);
+  popupCloseTimers.set(marker, t);
+}
+
+function clearStickyTimer(marker) {
+  var t = popupCloseTimers.get(marker);
+  if (t) { clearTimeout(t); popupCloseTimers.delete(marker); }
+}
+
+function togglePhotoLayer() {
+  photoLayerVisible = !photoLayerVisible;
+  var btn = document.getElementById('btn-photo-layer');
+  if (photoLayerVisible) {
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+  }
+  renderPhotoLayer();
+}
 
 function createMarker(loc) {
   const color = getColor(loc.category);
@@ -396,6 +506,7 @@ function createMarker(loc) {
     var p = e.target.getLatLng();
     loc.lat = p.lat; loc.lng = p.lng;
     toast('📍 ' + loc.name + ' moved');
+    renderPhotoLayer();
   });
   marker.on('click', function() {
     if (photoAssignMode && selectedPhoto) {
@@ -405,11 +516,13 @@ function createMarker(loc) {
       marker.openPopup();
       toast('📷 Photo assigned to ' + loc.name);
       renderPhotoPanel();
+      renderPhotoLayer();
       selectedPhoto = null; photoAssignMode = false;
       document.getElementById('photo-status').textContent = 'Select a photo below, then click a map marker';
       map.getContainer().style.cursor = '';
     }
   });
+  attachStickyPopup(marker);
   markers[loc.id] = marker;
 }
 
@@ -424,7 +537,7 @@ function updateMarkerIcon(loc) {
   markers[loc.id].setIcon(icon);
 }
 
-function popupHTML(loc) {
+function detailsHTML(loc) {
   var photos = '';
   if (loc.photos && loc.photos.length) {
     photos = '<div class="photo-gallery">';
@@ -447,7 +560,22 @@ function popupHTML(loc) {
     photos + '</div>';
 }
 
+function popupHTML(loc) {
+  if (loc.photos && loc.photos.length) {
+    var hero = loc.photos[0];
+    return '<div class="flip-card">' +
+      '<div class="flip-card-inner">' +
+      '<div class="flip-face flip-front"><img src="' + hero + '" alt="' + loc.name.replace(/"/g, '&quot;') + '"></div>' +
+      '<div class="flip-face flip-back">' + detailsHTML(loc) + '</div>' +
+      '</div></div>';
+  }
+  return detailsHTML(loc);
+}
+
 locations.forEach(function(l) { createMarker(l); });
+renderPhotoLayer();
+updateMarkerScale();
+map.on('zoomend', updateMarkerScale);
 
 // ======================================================================
 // PHOTO ASSIGNMENT
@@ -582,6 +710,7 @@ function saveNewPoint() {
   locations.push(loc);
   map.removeLayer(tempMarker); tempMarker = null;
   createMarker(loc); updateList(); cancelAdd();
+  renderPhotoLayer();
   toast('✅ ' + loc.name + ' added!');
 }
 
@@ -630,5 +759,6 @@ document.addEventListener('keydown', function(e) {
 
 updateList();
 </script>
-</body>
-</html>
+
+
+</body></html>
