@@ -1,0 +1,20 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.34" projectname="Amsterdam Oost - Linnaeusstraat">
+  <title>Amsterdam Oost - Linnaeusstraat Locations</title>
+  <projectlayers>
+    <maplayer>
+      <layername>Locations</layername>
+      <datasource>./locations.geojson</datasource>
+      <provider>ogr</provider>
+      <type>vector</type>
+      <geometry>Point</geometry>
+      <srs>
+        <spatialrefsys>
+          <proj4>+proj=longlat +datum=WGS84 +no_defs</proj4>
+          <srid>4326</srid>
+          <authid>EPSG:4326</authid>
+        </spatialrefsys>
+      </srs>
+    </maplayer>
+  </projectlayers>
+</qgis>

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amsterdam Oost - Linnaeusstraat Food Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #map { height: 100vh; width: 100%; }
+
+    .custom-marker { background: none; border: none; }
+    .marker-dot {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; cursor: pointer;
+    }
+    .marker-dot.has-photo { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52,152,219,0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(52,152,219,0); }
+      100% { box-shadow: 0 0 0 0 rgba(52,152,219,0); }
+    }
+
+    .loc-popup { min-width: 300px; max-width: 360px; }
+    .loc-popup h3 { margin: 0 0 4px; color: #2c3e50; font-size: 15px; }
+    .loc-popup .cat-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;
+    }
+    .cat-restaurant { background: #fce4e4; color: #c0392b; }
+    .cat-cafe { background: #fef3cd; color: #e67e22; }
+    .cat-fast_food { background: #fde8d0; color: #d35400; }
+    .cat-pub { background: #e8daef; color: #8e44ad; }
+    .cat-supermarket { background: #d5f5e3; color: #27ae60; }
+    .cat-shop { background: #d6eaf8; color: #2980b9; }
+    .cat-other { background: #eee; color: #555; }
+    .loc-popup .desc { color: #555; font-size: 12px; margin-bottom: 4px; }
+    .loc-popup .addr { color: #999; font-size: 11px; margin-bottom: 6px; }
+    .loc-popup .coords { color: #bbb; font-size: 10px; margin-bottom: 8px; }
+
+    .photo-gallery { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+    .photo-gallery img {
+      width: 90px; height: 70px; object-fit: cover;
+      border-radius: 4px; cursor: pointer; border: 2px solid #eee;
+      transition: transform 0.15s;
+    }
+    .photo-gallery img:hover { transform: scale(1.08); border-color: #3498db; }
+    .photo-add-btn {
+      width: 90px; height: 70px;
+      background: #f8f9fa; border: 2px dashed #ccc; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      color: #999; font-size: 11px; text-align: center; cursor: pointer;
+    }
+    .photo-add-btn:hover { border-color: #3498db; color: #3498db; }
+
+    .map-controls {
+      position: fixed; top: 10px; left: 56px; z-index: 1000;
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .ctrl-btn {
+      padding: 7px 14px; background: white;
+      border: 2px solid rgba(0,0,0,0.2); border-radius: 4px;
+      cursor: pointer; font-size: 12px; font-weight: 600; color: #333;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .ctrl-btn:hover { background: #f0f0f0; }
+    .ctrl-btn.active { background: #3498db; color: white; border-color: #2980b9; }
+
+    .sidebar {
+      position: fixed; top: 0; right: 0; width: 360px; height: 100vh;
+      background: white; box-shadow: -2px 0 12px rgba(0,0,0,0.12);
+      z-index: 1001; overflow-y: auto;
+      transform: translateX(100%); transition: transform 0.25s ease;
+    }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-hdr {
+      padding: 14px 18px; background: #2c3e50; color: white;
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 1;
+    }
+    .sidebar-hdr h2 { font-size: 15px; margin: 0; }
+    .sidebar-close { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+    .sidebar-body { padding: 12px 16px; }
+    .sidebar-filter {
+      width: 100%; padding: 8px 12px; border: 1px solid #ddd;
+      border-radius: 6px; margin-bottom: 10px; font-size: 13px;
+    }
+    .loc-item {
+      padding: 10px; border: 1px solid #eee; border-radius: 6px;
+      margin-bottom: 6px; cursor: pointer; transition: background 0.15s;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .loc-item:hover { background: #f8f9fa; }
+    .loc-item .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .loc-item h4 { margin: 0; font-size: 13px; color: #2c3e50; }
+    .loc-item p { margin: 0; font-size: 11px; color: #999; }
+    .loc-item .photo-count { margin-left: auto; font-size: 10px; color: #3498db; white-space: nowrap; }
+
+    .photo-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: 180px; background: white;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
+      z-index: 1001; display: none; flex-direction: column;
+    }
+    .photo-panel.open { display: flex; }
+    .photo-panel-hdr {
+      padding: 8px 16px; background: #34495e; color: white;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .photo-panel-hdr h3 { font-size: 13px; margin: 0; }
+    .photo-panel-hdr small { color: #aaa; font-size: 11px; }
+    .photo-panel-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; }
+    .photo-strip {
+      flex: 1; display: flex; gap: 8px; padding: 10px 16px;
+      overflow-x: auto; align-items: center;
+    }
+    .photo-thumb {
+      flex-shrink: 0; width: 120px; height: 120px; position: relative;
+      border-radius: 6px; overflow: hidden; cursor: pointer;
+      border: 3px solid #eee; transition: border-color 0.15s;
+    }
+    .photo-thumb:hover { border-color: #3498db; }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb .label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.65); color: white;
+      font-size: 9px; padding: 3px 6px; text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .photo-thumb.assigned { border-color: #27ae60; }
+    .photo-thumb.assigned::after {
+      content: '\2713'; position: absolute; top: 4px; right: 6px;
+      background: #27ae60; color: white; border-radius: 50%;
+      width: 18px; height: 18px; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .photo-thumb.selected { border-color: #e74c3c; }
+
+    .add-form {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: white; padding: 18px; border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2); z-index: 1001;
+      width: 380px; display: none;
+    }
+    .add-form.visible { display: block; }
+    .add-form h3 { margin: 0 0 10px; color: #2c3e50; font-size: 14px; }
+    .add-form label { display: block; font-size: 11px; color: #666; margin: 6px 0 3px; }
+    .add-form input, .add-form select, .add-form textarea {
+      width: 100%; padding: 7px 10px; border: 1px solid #ddd;
+      border-radius: 5px; font-size: 12px;
+    }
+    .add-form textarea { height: 50px; resize: vertical; }
+    .form-btns { display: flex; gap: 8px; margin-top: 10px; }
+    .form-btns button {
+      flex: 1; padding: 8px; border: none; border-radius: 5px;
+      cursor: pointer; font-weight: 600; font-size: 12px;
+    }
+    .btn-save { background: #27ae60; color: white; }
+    .btn-cancel { background: #eee; color: #333; }
+
+    .lightbox {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.92); z-index: 2000;
+      align-items: center; justify-content: center;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img { max-width: 92%; max-height: 92%; border-radius: 6px; }
+    .lightbox-close {
+      position: absolute; top: 16px; right: 24px;
+      color: white; font-size: 30px; cursor: pointer;
+      background: none; border: none;
+    }
+
+    .toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #2c3e50; color: white; padding: 10px 18px;
+      border-radius: 6px; z-index: 3000; font-size: 12px;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    .legend {
+      position: fixed; bottom: 16px; left: 16px; z-index: 1000;
+      background: white; border-radius: 6px; padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 11px;
+    }
+    .legend h4 { margin: 0 0 6px; font-size: 12px; color: #333; }
+    .legend-row { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+    .legend-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="map-controls">
+  <button class="ctrl-btn" id="btn-add" onclick="toggleAddMode()">📍 Add Point</button>
+  <button class="ctrl-btn" onclick="toggleSidebar()">📋 All Locations</button>
+  <button class="ctrl-btn" onclick="togglePhotoPanel()">🖼️ Photo Manager</button>
+  <button class="ctrl-btn" onclick="exportGeoJSON()">💾 Export GeoJSON</button>
+</div>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-hdr">
+    <h2>📍 All Locations (<span id="loc-count">0</span>)</h2>
+    <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+  </div>
+  <div class="sidebar-body">
+    <input class="sidebar-filter" id="filter" type="text" placeholder="🔍 Search locations..." oninput="updateList()">
+    <div id="loc-list"></div>
+  </div>
+</div>
+
+<div class="photo-panel" id="photo-panel">
+  <div class="photo-panel-hdr">
+    <div>
+      <h3>🖼️ Photo Manager — click a photo, then click a marker to attach</h3>
+      <small id="photo-status">Select a photo below, then click a map marker</small>
+    </div>
+    <button class="photo-panel-close" onclick="togglePhotoPanel()">×</button>
+  </div>
+  <div class="photo-strip" id="photo-strip"></div>
+</div>
+
+<div class="add-form" id="add-form">
+  <h3>📍 Add New Location</h3>
+  <p style="font-size:11px;color:#e74c3c;margin-bottom:6px;">Click on the map to place</p>
+  <label>Name</label>
+  <input id="inp-name" placeholder="e.g. My Favorite Café">
+  <label>Category</label>
+  <select id="inp-cat">
+    <option value="cafe">☕ Café</option>
+    <option value="restaurant">🍽️ Restaurant</option>
+    <option value="fast_food">🍟 Fast Food</option>
+    <option value="pub">🍺 Pub / Bar</option>
+    <option value="supermarket">🛒 Supermarket</option>
+    <option value="shop">🛍️ Shop</option>
+    <option value="other">📌 Other</option>
+  </select>
+  <label>Description</label>
+  <textarea id="inp-desc"></textarea>
+  <label>Address</label>
+  <input id="inp-addr" placeholder="Street address">
+  <div class="form-btns">
+    <button class="btn-save" onclick="saveNewPoint()">Save</button>
+    <button class="btn-cancel" onclick="cancelAdd()">Cancel</button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close">×</button>
+  <img id="lb-img" src="">
+</div>
+
+<div class="legend">
+  <h4>Legend</h4>
+  <div class="legend-row"><div class="legend-dot" style="background:#e74c3c"></div> Restaurant</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#f39c12"></div> Café / Coffee</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#e67e22"></div> Fast Food</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#9b59b6"></div> Pub / Bar</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#27ae60"></div> Supermarket</div>
+  <div class="legend-row"><div class="legend-dot" style="background:#2980b9"></div> Shop</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ======================================================================
+// ALL LOCATIONS — from your OSM export with real coordinates
+// ======================================================================
+const locations = [
+  { id: 1, name: "Meram", category: "restaurant", description: "Turkish cuisine, halal", address: "Pretoriusstraat 22-H", lat: 52.3560114, lng: 4.9255949, photos: [], website: "https://meram.nl/" },
+  { id: 2, name: "DekaMarkt", category: "supermarket", description: "Supermarket, Mo-Sa 08-21, Su 09-21", address: "Pretoriusstraat 9", lat: 52.3560493, lng: 4.9269333, photos: [] },
+  { id: 3, name: "Konet", category: "shop", description: "Butcher shop", address: "Pretoriusstraat 10-H", lat: 52.3562767, lng: 4.9266467, photos: [] },
+  { id: 4, name: "Cafe Sport", category: "pub", description: "Pub on Linnaeusstraat", address: "Linnaeusstraat 102", lat: 52.3558199, lng: 4.9276134, photos: ["photos/WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg", "photos/Schermafbeelding 2026-02-05 224239.png"] },
+  { id: 5, name: "Natraj", category: "restaurant", description: "Indian cuisine, vegetarian options", address: "Transvaalstraat 5", lat: 52.355557, lng: 4.9274907, photos: [] },
+  { id: 6, name: "Fuku Ramen", category: "restaurant", description: "Ramen, Th-Sa 18-23, Su 13-19:30", address: "Ingogostraat 14A", lat: 52.3552228, lng: 4.9257723, photos: [] },
+  { id: 7, name: "Toko Sumatra Deli", category: "fast_food", description: "Indonesian fast food, halal", address: "Linnaeusstraat area", lat: 52.3562076, lng: 4.9279618, photos: [] },
+  { id: 8, name: "The Cottage Shop & Deli", category: "cafe", description: "Tu-Th 10-18, Fr 09-18, Sa 09-17, Su 10-17", address: "Linnaeusstraat 76-H", lat: 52.3567032, lng: 4.9271456, photos: [] },
+  { id: 9, name: "Cafecito", category: "cafe", description: "Specialty coffee roastery, Mo-Fr 07-18, Sa-Su 09-18", address: "Linnaeusstraat 112-H", lat: 52.3554464, lng: 4.9279124, photos: ["photos/WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg", "photos/WhatsApp Image 2026-02-05 at 16.31.59.jpeg"] },
+  { id: 10, name: "FEBO", category: "fast_food", description: "Dutch fast food, 11:30-24:00", address: "Linnaeusstraat 92", lat: 52.3560684, lng: 4.9274267, photos: ["photos/Schermafbeelding 2026-02-05 225055.png"] },
+  { id: 11, name: "Ayaz Döner", category: "fast_food", description: "Turkish fast food", address: "Linnaeusstraat 213", lat: 52.356375, lng: 4.9277837, photos: ["photos/Schermafbeelding 2026-02-05 224751.png"] },
+  { id: 12, name: "Grapedistrict", category: "shop", description: "Wine shop", address: "Linnaeusstraat area", lat: 52.3555833, lng: 4.9277931, photos: [] },
+  { id: 13, name: "Ruk en Pluk", category: "pub", description: "Pub, We-Su 15:00+", address: "Linnaeusstraat area", lat: 52.3574255, lng: 4.9266379, photos: [] },
+  { id: 14, name: "Q Cafe", category: "cafe", description: "Café with outdoor seating", address: "Oranje-Vrijstaatkade area", lat: 52.3575378, lng: 4.9303363, photos: [] },
+  { id: 15, name: "Meram Cafe", category: "cafe", description: "Turkish café, 12:00-24:00", address: "Linnaeusstraat 219", lat: 52.3563175, lng: 4.9278659, photos: ["photos/Schermafbeelding 2026-02-05 224822.png"] },
+  { id: 16, name: "Rum Baba", category: "shop", description: "Coffee shop, Mo-Fr 09-16:30, Sa-Su 10-17", address: "Pretoriusstraat 15", lat: 52.3559916, lng: 4.9265383, photos: [] },
+  { id: 17, name: "The Cottage", category: "restaurant", description: "Comfort Food & Drinks", address: "Linnaeusstraat 88", lat: 52.356135, lng: 4.927206, photos: ["photos/WhatsApp Image 2026-02-05 at 16.31.58.jpeg", "photos/WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg", "photos/Schermafbeelding 2026-02-05 224728.png", "photos/Schermafbeelding 2026-02-05 224703.png"] },
+  { id: 18, name: "Wakuli", category: "cafe", description: "Specialty Coffee — weekdays 7-18, weekends 8-18", address: "Oranje-Vrijstaatkade", lat: 52.3560141, lng: 4.9280631, photos: ["photos/WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg", "photos/WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg", "photos/Schermafbeelding 2026-02-05 224901.png"] },
+  { id: 19, name: "Albert Heijn", category: "supermarket", description: "Supermarket, Mo-Sa 08-22, Su 09-22", address: "Land van Cocagneplein 3", lat: 52.3570557, lng: 4.9281602, photos: [] },
+  { id: 20, name: "Burger 'n Shake", category: "fast_food", description: "Burger fast food, 12:00-23:00", address: "Land van Cocagneplein 1D", lat: 52.3569968, lng: 4.9275625, photos: [] },
+  { id: 21, name: "Vitaminstore", category: "shop", description: "Nutrition supplements", address: "Land van Cocagneplein 46", lat: 52.3567833, lng: 4.9285625, photos: [] },
+  { id: 22, name: "De Bakkerszonen", category: "shop", description: "Bakery", address: "Land van Cocagneplein 48", lat: 52.356818, lng: 4.9287396, photos: [] },
+  { id: 23, name: "Simon Lévelt", category: "shop", description: "Tea & coffee shop", address: "Waldenlaan 4", lat: 52.3568513, lng: 4.9288843, photos: [] },
+  { id: 24, name: "Bagels & Beans", category: "cafe", description: "Coffee shop, Mo-Th 08:30-17, Fr 08:30-16", address: "Oranje-Vrijstaatkade 68", lat: 52.3558409, lng: 4.9289633, photos: [] },
+  { id: 25, name: "De Bierkantine", category: "pub", description: "Brewery pub with outdoor seating", address: "Oranje-Vrijstaatkade 69", lat: 52.3564531, lng: 4.9302489, photos: [] },
+  { id: 26, name: "Holland & Barrett", category: "shop", description: "Health food store", address: "Waldenlaan 129", lat: 52.3570648, lng: 4.928912, photos: [] },
+  { id: 27, name: "Miss Hotpot", category: "restaurant", description: "Hotpot restaurant", address: "Linnaeusstraat 64-H", lat: 52.3570307, lng: 4.9269363, photos: [] },
+  { id: 28, name: "New York Pizza", category: "fast_food", description: "Pizza, 16-24", address: "Linnaeusstraat 68-H", lat: 52.3569352, lng: 4.9269969, photos: [] },
+  { id: 29, name: "Marina Plaza", category: "restaurant", description: "Restaurant", address: "Linnaeusstraat 74-H", lat: 52.356753, lng: 4.9271066, photos: [] },
+  { id: 30, name: "Sahan", category: "shop", description: "Convenience store", address: "Waldenlaan 135", lat: 52.3572195, lng: 4.9294608, photos: [] },
+  { id: 31, name: "Jumbo", category: "supermarket", description: "Supermarket, Mo-Sa 08-22, Su 09-22", address: "Linnaeusstraat 245-H", lat: 52.3557035, lng: 4.9282388, photos: ["photos/Schermafbeelding 2026-02-05 225001.png"] },
+  { id: 32, name: "Biolicious", category: "shop", description: "Organic convenience store", address: "Land van Cocagneplein 5", lat: 52.3570148, lng: 4.9282549, photos: [] },
+  { id: 33, name: "Moche", category: "restaurant", description: "Peruvian cuisine, Tu-Sa", address: "Linnaeuskade 3-H", lat: 52.35523, lng: 4.9290902, photos: [] },
+  { id: 34, name: "Nomads", category: "restaurant", description: "International restaurant", address: "Oranje-Vrijstaatkade 55", lat: 52.3564197, lng: 4.9300496, photos: [] },
+  { id: 35, name: "Yemen Restaurant", category: "restaurant", description: "Yemeni cuisine", address: "Oranje-Vrijstaatkade 66", lat: 52.3559762, lng: 4.9288126, photos: [] },
+  { id: 36, name: "Mas Atelier", category: "shop", description: "Bakery, We-Sa 09-15", address: "Pretoriusstraat 33", lat: 52.3557711, lng: 4.925747, photos: [] },
+  { id: 37, name: "Flour.ish", category: "shop", description: "Gluten-free organic supermarket", address: "Pretoriusstraat 37", lat: 52.355701, lng: 4.9254428, photos: [] },
+  { id: 38, name: "Blend Coffee and Wine", category: "pub", description: "Coffee & wine bar, 10-19", address: "Oranje-Vrijstaatkade area", lat: 52.3565378, lng: 4.9303232, photos: [] },
+  { id: 39, name: "Eighty-Four", category: "restaurant", description: "International & European cuisine, fish", address: "Oranje-Vrijstaatkade 25", lat: 52.3563155, lng: 4.9295542, photos: [] },
+  { id: 40, name: "Biolicious (Linnaeusstraat)", category: "shop", description: "Organic convenience", address: "Linnaeusstraat 70-72", lat: 52.3568365, lng: 4.9270394, photos: [] },
+  { id: 41, name: "Helin's Döner", category: "fast_food", description: "Döner, vegan options, 11-22", address: "Linnaeusstraat 221", lat: 52.3562634, lng: 4.9279129, photos: ["photos/WhatsApp Image 2026-02-05 at 16.32.00.jpeg"] },
+  { id: 42, name: "Kwekkeboom", category: "cafe", description: "Café", address: "Land van Cocagneplein", lat: 52.3569788, lng: 4.9284743, photos: [] },
+  { id: 43, name: "Aan De Kade", category: "restaurant", description: "Restaurant", address: "Linnaeuskade area", lat: 52.3551651, lng: 4.9289257, photos: [] },
+  { id: 44, name: "Drankerij", category: "shop", description: "Drinks shop, We-Su", address: "Linnaeusstraat area", lat: 52.3561221, lng: 4.9271093, photos: [] },
+  { id: 45, name: "Safak", category: "restaurant", description: "Pide & Lahmacun, Turkish", address: "Linnaeusstraat", lat: 52.3573, lng: 4.9268, photos: ["photos/Schermafbeelding 2026-02-05 224802.png"] }
+];
+
+// ======================================================================
+// ALL AVAILABLE PHOTOS (copied to photos/ folder)
+// ======================================================================
+const availablePhotos = [
+  "photos/WhatsApp Image 2026-02-05 at 13.10.12 (1).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 13.10.12.jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.31.58.jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.31.59 (1).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.31.59 (2).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.31.59 (3).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.31.59.jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.32.00 (1).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.32.00 (2).jpeg",
+  "photos/WhatsApp Image 2026-02-05 at 16.32.00.jpeg",
+  "photos/Schermafbeelding 2026-02-05 155352.png",
+  "photos/Schermafbeelding 2026-02-05 160039.png",
+  "photos/Schermafbeelding 2026-02-05 160129.png",
+  "photos/Schermafbeelding 2026-02-05 160144.png",
+  "photos/Schermafbeelding 2026-02-05 161524.png",
+  "photos/Schermafbeelding 2026-02-05 224239.png",
+  "photos/Schermafbeelding 2026-02-05 224703.png",
+  "photos/Schermafbeelding 2026-02-05 224728.png",
+  "photos/Schermafbeelding 2026-02-05 224751.png",
+  "photos/Schermafbeelding 2026-02-05 224802.png",
+  "photos/Schermafbeelding 2026-02-05 224822.png",
+  "photos/Schermafbeelding 2026-02-05 224843.png",
+  "photos/Schermafbeelding 2026-02-05 224901.png",
+  "photos/Schermafbeelding 2026-02-05 225001.png",
+  "photos/Schermafbeelding 2026-02-05 225055.png"
+];
+
+// ======================================================================
+// MAP
+// ======================================================================
+const map = L.map('map').setView([52.3563, 4.9278], 17);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>',
+  maxZoom: 20
+}).addTo(map);
+
+const catColors = {
+  restaurant: '#e74c3c', cafe: '#f39c12', fast_food: '#e67e22',
+  pub: '#9b59b6', supermarket: '#27ae60', shop: '#2980b9', other: '#7f8c8d'
+};
+const catIcons = {
+  restaurant: '🍽️', cafe: '☕', fast_food: '🍟',
+  pub: '🍺', supermarket: '🛒', shop: '🛍️', other: '📌'
+};
+function getColor(c) { return catColors[c] || catColors.other; }
+function getIcon(c) { return catIcons[c] || catIcons.other; }
+function getCatClass(c) { return catColors[c] ? 'cat-' + c : 'cat-other'; }
+
+const markers = {};
+let addMode = false, tempMarker = null, nextId = locations.length + 1;
+let selectedPhoto = null, photoAssignMode = false;
+
+function createMarker(loc) {
+  const color = getColor(loc.category);
+  const hasPh = loc.photos && loc.photos.length > 0;
+  const icon = L.divIcon({
+    className: 'custom-marker',
+    html: '<div class="marker-dot ' + (hasPh ? 'has-photo' : '') + '" style="background:' + color + '">' + getIcon(loc.category) + '</div>',
+    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
+  });
+  const marker = L.marker([loc.lat, loc.lng], { icon: icon, draggable: true })
+    .addTo(map)
+    .bindPopup(function() { return popupHTML(loc); }, { maxWidth: 360 });
+
+  marker.on('dragend', function(e) {
+    var p = e.target.getLatLng();
+    loc.lat = p.lat; loc.lng = p.lng;
+    toast('📍 ' + loc.name + ' moved');
+  });
+  marker.on('click', function() {
+    if (photoAssignMode && selectedPhoto) {
+      loc.photos.push(selectedPhoto);
+      updateMarkerIcon(loc);
+      marker.setPopupContent(popupHTML(loc));
+      marker.openPopup();
+      toast('📷 Photo assigned to ' + loc.name);
+      renderPhotoPanel();
+      selectedPhoto = null; photoAssignMode = false;
+      document.getElementById('photo-status').textContent = 'Select a photo below, then click a map marker';
+      map.getContainer().style.cursor = '';
+    }
+  });
+  markers[loc.id] = marker;
+}
+
+function updateMarkerIcon(loc) {
+  var color = getColor(loc.category);
+  var hasPh = loc.photos && loc.photos.length > 0;
+  var icon = L.divIcon({
+    className: 'custom-marker',
+    html: '<div class="marker-dot ' + (hasPh ? 'has-photo' : '') + '" style="background:' + color + '">' + getIcon(loc.category) + '</div>',
+    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
+  });
+  markers[loc.id].setIcon(icon);
+}
+
+function popupHTML(loc) {
+  var photos = '';
+  if (loc.photos && loc.photos.length) {
+    photos = '<div class="photo-gallery">';
+    for (var i = 0; i < loc.photos.length; i++) {
+      var p = loc.photos[i];
+      photos += '<img src="' + p + '" alt="' + loc.name + '" onclick="openLightbox(\'' + p.replace(/'/g, "\\'") + '\')" onerror="this.style.display=\'none\'">';
+    }
+    photos += '<div class="photo-add-btn" onclick="openPhotoPanel()">➕ Add</div></div>';
+  } else {
+    photos = '<div class="photo-gallery"><div class="photo-add-btn" onclick="openPhotoPanel()">📷 Attach<br>photo</div></div>';
+  }
+  var ws = loc.website ? '<div style="font-size:11px;margin-bottom:4px"><a href="' + loc.website + '" target="_blank">🌐 Website</a></div>' : '';
+  return '<div class="loc-popup">' +
+    '<h3>' + loc.name + '</h3>' +
+    '<span class="cat-badge ' + getCatClass(loc.category) + '">' + loc.category.replace('_', ' ') + '</span>' +
+    '<div class="desc">' + loc.description + '</div>' +
+    '<div class="addr">📍 ' + loc.address + '</div>' +
+    ws +
+    '<div class="coords">' + loc.lat.toFixed(5) + ', ' + loc.lng.toFixed(5) + '</div>' +
+    photos + '</div>';
+}
+
+locations.forEach(function(l) { createMarker(l); });
+
+// ======================================================================
+// PHOTO ASSIGNMENT
+// ======================================================================
+function openPhotoPanel() {
+  var panel = document.getElementById('photo-panel');
+  if (!panel.classList.contains('open')) panel.classList.add('open');
+  renderPhotoPanel();
+  setTimeout(function() { map.invalidateSize(); }, 300);
+}
+
+function togglePhotoPanel() {
+  var panel = document.getElementById('photo-panel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) renderPhotoPanel();
+  setTimeout(function() { map.invalidateSize(); }, 300);
+}
+
+function renderPhotoPanel() {
+  var strip = document.getElementById('photo-strip');
+  var assigned = {};
+  locations.forEach(function(l) {
+    l.photos.forEach(function(p) { assigned[p] = l.name; });
+  });
+  var html = '';
+  for (var i = 0; i < availablePhotos.length; i++) {
+    var p = availablePhotos[i];
+    var fname = p.split('/').pop();
+    var isAssigned = !!assigned[p];
+    var isSel = selectedPhoto === p;
+    var cls = 'photo-thumb';
+    if (isAssigned) cls += ' assigned';
+    if (isSel) cls += ' selected';
+    var title = isAssigned ? 'Assigned to: ' + assigned[p] : 'Click to select';
+    html += '<div class="' + cls + '" title="' + title + '" onclick="selectPhoto(\'' + p.replace(/'/g, "\\'") + '\')">' +
+      '<img src="' + p + '" alt="' + fname + '" onerror="this.parentElement.innerHTML=\'<div style=padding:8px;font-size:10px;color:#999;text-align:center>' + fname + '</div>\'">' +
+      '<div class="label">' + fname + '</div></div>';
+  }
+  strip.innerHTML = html;
+}
+
+function selectPhoto(photoPath) {
+  selectedPhoto = photoPath;
+  photoAssignMode = true;
+  map.getContainer().style.cursor = 'crosshair';
+  document.getElementById('photo-status').textContent = 'Selected: ' + photoPath.split('/').pop() + ' — now click a marker on the map';
+  renderPhotoPanel();
+  toast('📷 Now click a location marker to attach this photo');
+}
+
+// ======================================================================
+// SIDEBAR
+// ======================================================================
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  updateList();
+}
+
+function updateList() {
+  var q = (document.getElementById('filter').value || '').toLowerCase();
+  var filtered = locations.filter(function(l) {
+    return l.name.toLowerCase().indexOf(q) >= 0 ||
+           l.category.indexOf(q) >= 0 ||
+           l.address.toLowerCase().indexOf(q) >= 0;
+  });
+  document.getElementById('loc-count').textContent = filtered.length;
+  var html = '';
+  for (var i = 0; i < filtered.length; i++) {
+    var l = filtered[i];
+    html += '<div class="loc-item" onclick="flyTo(' + l.id + ')">' +
+      '<div class="dot" style="background:' + getColor(l.category) + '"></div>' +
+      '<div><h4>' + getIcon(l.category) + ' ' + l.name + '</h4>' +
+      '<p>' + l.address + '</p></div>' +
+      (l.photos.length ? '<span class="photo-count">📷 ' + l.photos.length + '</span>' : '') +
+      '</div>';
+  }
+  document.getElementById('loc-list').innerHTML = html;
+}
+
+function flyTo(id) {
+  var loc = locations.find(function(l) { return l.id === id; });
+  if (loc && markers[id]) {
+    map.flyTo([loc.lat, loc.lng], 18, { duration: 0.4 });
+    markers[id].openPopup();
+  }
+}
+
+// ======================================================================
+// ADD POINT
+// ======================================================================
+function toggleAddMode() {
+  addMode = !addMode;
+  if (addMode) {
+    document.getElementById('btn-add').classList.add('active');
+    document.getElementById('add-form').classList.add('visible');
+    map.getContainer().style.cursor = 'crosshair';
+    toast('Click on the map to place a new point');
+  } else { cancelAdd(); }
+}
+
+function cancelAdd() {
+  addMode = false;
+  document.getElementById('btn-add').classList.remove('active');
+  document.getElementById('add-form').classList.remove('visible');
+  map.getContainer().style.cursor = '';
+  if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+}
+
+map.on('click', function(e) {
+  if (!addMode) return;
+  if (tempMarker) map.removeLayer(tempMarker);
+  tempMarker = L.marker(e.latlng, {
+    icon: L.divIcon({ className: 'custom-marker',
+      html: '<div class="marker-dot" style="background:#3498db">📍</div>',
+      iconSize: [28,28], iconAnchor: [14,14] })
+  }).addTo(map);
+  tempMarker._pos = e.latlng;
+});
+
+function saveNewPoint() {
+  if (!tempMarker) { toast('⚠️ Click map first'); return; }
+  var name = document.getElementById('inp-name').value.trim();
+  if (!name) { toast('⚠️ Enter a name'); return; }
+  var loc = {
+    id: nextId++, name: name,
+    category: document.getElementById('inp-cat').value,
+    description: document.getElementById('inp-desc').value.trim(),
+    address: document.getElementById('inp-addr').value.trim() || 'Amsterdam Oost',
+    lat: tempMarker._pos.lat, lng: tempMarker._pos.lng,
+    photos: []
+  };
+  locations.push(loc);
+  map.removeLayer(tempMarker); tempMarker = null;
+  createMarker(loc); updateList(); cancelAdd();
+  toast('✅ ' + loc.name + ' added!');
+}
+
+// ======================================================================
+// EXPORT
+// ======================================================================
+function exportGeoJSON() {
+  var features = locations.map(function(l) {
+    return {
+      type: "Feature",
+      properties: { id: l.id, name: l.name, category: l.category,
+        description: l.description, address: l.address,
+        photos: l.photos, website: l.website || '' },
+      geometry: { type: "Point", coordinates: [l.lng, l.lat] }
+    };
+  });
+  var gj = { type: "FeatureCollection",
+    name: "Amsterdam Oost - Linnaeusstraat Locations",
+    features: features };
+  var blob = new Blob([JSON.stringify(gj, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'locations.geojson';
+  a.click();
+  toast('💾 GeoJSON exported!');
+}
+
+// ======================================================================
+// UTILITIES
+// ======================================================================
+function openLightbox(src) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('active'); }
+
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { if (addMode) cancelAdd(); closeLightbox(); }
+});
+
+updateList();
+</script>
+</body>
+</html>
